@@ -1,0 +1,26 @@
+---
+version: https://codecheck.org.uk/spec/config/1.0/
+
+manifest:
+  - file: NA
+    comment: "The AGILE 2026 Reproducibility Review did not include manifest documentation, see https://github.com/codecheckers/register/issues/186 for more information"
+
+paper:
+  title: ""
+  authors:
+    - name: 
+      ORCID: 
+    - name: 
+      ORCID: 
+  reference: https://doi.org/10.5194/agile-giss-7--2026
+
+codechecker:
+  - name: 
+    ORCID: 
+
+report: https://doi.org/...
+summary: |
+    ...
+repository: ..
+check_time: "2026-mm-dd 12:00:00"
+certificate: 2026-xxx
