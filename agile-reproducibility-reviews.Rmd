@@ -828,7 +828,7 @@ review_data_csv_file <- file.path(review_files_path, paste0("review_data_", lubr
 review_files <- review_data %>%
   filter(type == "Full paper") %>%
   dplyr::filter(Decisions == "ACCEPT") %>%
-  select(id, submission_id, Decisions, Title, file, paper)
+  select(id, submission_id, Decisions, Authors, Title, file, paper)
 
 if(easychair_logged_in) {
   # re-download all accepted full paper PDFs to make sure we have latest copies
