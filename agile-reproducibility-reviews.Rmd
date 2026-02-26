@@ -17,10 +17,11 @@ params:
 This document includes scripts and text analysis to support the reproducibility review at the [AGILE conference 2026](https://agile-gi.eu/conference-2026), which is organised by the team of the Chair for Geoinformatics, TU Dresden, Germany.
 
 Find out more online [about reproducible publications at AGILE](https://doi.org/10.17605/OSF.IO/PHMCE) and the [review process](https://osf.io/eg4qx/), and visit the Reproducible AGILE website: [https://reproducible-agile.github.io/](https://reproducible-agile.github.io/).
-The code of this document is published on GitHub in the repository [reproducible-agile/reviews-2026](https://github.com/reproducible-agile/reviews-2026), where you can inspect the R code in the file `agile-reproducibility-reviews.Rmd` and find instructions for reproducing the workflow.
-The [report parameter](https://bookdown.org/yihui/rmarkdown/parameterized-reports.html) `private_info` can be set to `yes` to show information which cannot be shared publicly, such as author names, titles, or excerpts of not accepted submissions, and to upload review files to private shares, which requires authentication.
-The end of this document contains a hidden code snippet to only render information accepted for publication as a GitHub page.
+The code of this document is published on GitHub in the repository [reproducible-agile/reviews-2026](https://github.com/reproducible-agile/reviews-2026), where you can inspect the R code in the file `agile-reproducibility-reviews.Rmd` and find instructions for using this document to support the reproducibility review.
 
+The [report parameter](https://bookdown.org/yihui/rmarkdown/parameterized-reports.html) `private_info` can be set to `yes` to show information which cannot be shared publicly, such as author names, titles, or excerpts of not accepted submissions, and to upload review files to private shares, which requires authentication.
+If you read this report publicly online, you are reading the version without private information.
+If you are interested in the full version, please contact the AGILE chairs or the authors of this report.
 
 ```{r load_libraries, message=FALSE, warning=FALSE, include=FALSE}
 # Load .Renviron from working directory (needed when running in Docker where the
@@ -53,17 +54,21 @@ set.seed(29) # 29th AGILE!
 ```
 
 ```{r conference_id, echo=params$private_info}
-# get this from the URL when logged into EasyChair, e.g., https://easychair.org/conferences2/submissions?a=36110000
-conference_id <- "36110000"
+# EasyChair conference IDs — there are two different IDs for the same conference:
+#   36110000 — the "editor" (PC member) ID, shown in URLs when logged in as reviewer/PC member
+#   36190656 — the "conference chair" ID, used for full chair-level access (submissions, reviews, author contacts)
+# Navigate via https://easychair.org/my2/conference?conf=agile2026 and extract the ID from the submissions link
+conference_id <- "36190656"
 ```
 
-```{r easychair_login, echo=params$private_info}
+```{r easychair_login, echo=params$private_info, results=if(!params$private_info) "hide" else "markup", warning=params$private_info}
 easychair_logged_in <- FALSE
 ec_ua <- httr::user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 
 if(is.na(Sys.getenv("easychair_username", unset = NA)) || is.na(Sys.getenv("easychair_password", unset = NA))) {
-  stop("Provide login details for EasyChair (e.g., in a file `.Renviron` - make sure to adjust read permissions so that no user but you/root may access the file!) in environment variables",
-       " `easychair_username` and `easychair_password`")
+  warning("EasyChair credentials not found. Provide login details (e.g., in a file `.Renviron`) in environment variables",
+          " `easychair_username` and `easychair_password`.",
+          " Falling back to cached data if available.")
 }
 
 # EasyChair uses an AJAX-based login flow (as of 2025/2026):
@@ -73,19 +78,18 @@ if(is.na(Sys.getenv("easychair_username", unset = NA)) || is.na(Sys.getenv("easy
 # httr reuses cookies automatically via its per-host handle pool, so all subsequent
 # httr::GET/POST calls to easychair.org will carry the session cookies from this login.
 
-if(!exists("login_response") || is.null(login_response)) {
-  # GET the login page first to establish session cookies and extract form field names
+# Reusable login function — can be called again if session expires mid-render
+ec_login <- function() {
+  # Clear any stale session cookies (important when re-rendering from an active RStudio session)
+  httr::handle_reset("https://easychair.org")
   login_page <- httr::GET(url = "https://easychair.org/account/signin", ec_ua)
   login_html <- xml2::read_html(login_page)
-
-  # extract the submit button ID (used as a form parameter)
   submit_btn <- rvest::html_element(login_html, "form input[type='submit']")
   button_id <- rvest::html_attr(submit_btn, "id")
   cat("Login page URL:", login_page$url, "\n")
   cat("Submit button ID:", button_id, "\n")
 
-  # POST to the AJAX endpoint with correct field names
-  login_response <- httr::POST(
+  resp <- httr::POST(
     url = "https://easychair.org/account/signin_x",
     body = list(
       email    = Sys.getenv("easychair_username"),
@@ -104,55 +108,60 @@ if(!exists("login_response") || is.null(login_response)) {
     )
   )
 
-  login_status <- httr::status_code(login_response)
-  cat("Login response status:", login_status, "\n")
-  login_cookies <- httr::cookies(login_response)
-  cat("Cookies set:", nrow(login_cookies), "\n")
-  if(nrow(login_cookies) > 0) cat("  names:", paste(login_cookies$name, collapse = ", "), "\n")
-
-  # parse JSON response
+  cat("Login response status:", httr::status_code(resp), "\n")
   login_json <- tryCatch(
-    jsonlite::fromJSON(httr::content(login_response, as = "text", encoding = "UTF-8")),
+    jsonlite::fromJSON(httr::content(resp, as = "text", encoding = "UTF-8")),
     error = function(e) list()
   )
   cat("Login response keys:", paste(names(login_json), collapse = ", "), "\n")
 
-  # check for failure indicators
-  if(!is.null(login_json$reload) && grepl("signin_failed", login_json$reload)) {
-    login_response <- NULL
+  if(!is.null(login_json$reload) && grepl("signin_failed", login_json$reload))
     stop("EasyChair login failed — wrong credentials. Check email/password in .Renviron")
-  }
-  if(!is.null(login_json$err)) {
-    login_response <- NULL
+  if(!is.null(login_json$err))
     stop("EasyChair login error: ", paste(login_json$err, collapse = "; "))
-  }
 
-  # on success, follow the redirect URL to establish the full session
   redirect_path <- login_json$load %||% login_json$reload
   if(!is.null(redirect_path)) {
-    redirect_url <- paste0("https://easychair.org", redirect_path)
-    cat("Following redirect to:", redirect_url, "\n")
-    httr::GET(url = redirect_url, ec_ua)
+    cat("Following redirect to:", redirect_path, "\n")
+    httr::GET(url = paste0("https://easychair.org", redirect_path), ec_ua)
   }
 
-  # quick auth check: fetch a protected page and verify we're not redirected to login
   auth_check <- httr::GET(url = paste0("https://easychair.org/conferences2/submissions?a=", conference_id), ec_ua)
-  if(grepl("signin", auth_check$url)) {
-    login_response <- NULL
+  if(grepl("signin", auth_check$url))
     stop("EasyChair login appeared to succeed but session is not valid ",
-         "(submissions page redirected to: ", auth_check$url, "). ",
-         "EasyChair may require browser-based login.")
-  }
+         "(submissions page redirected to: ", auth_check$url, ").")
 
-  easychair_logged_in <- TRUE
   cat("Logged in at EasyChair successfully\n")
+  resp
+}
+
+# Check session validity; re-login if expired
+ec_ensure_session <- function() {
+  check <- httr::GET(url = paste0("https://easychair.org/conferences2/submissions?a=", conference_id), ec_ua)
+  if(grepl("signin", check$url)) {
+    cat("EasyChair session expired, re-logging in...\n")
+    login_response <<- ec_login()
+  }
+}
+
+if(!is.na(Sys.getenv("easychair_username", unset = NA)) && !is.na(Sys.getenv("easychair_password", unset = NA))) {
+  tryCatch({
+    if(!exists("login_response") || is.null(login_response)) {
+      login_response <- ec_login()
+      easychair_logged_in <- TRUE
+    } else {
+      easychair_logged_in <- TRUE
+      cat("Already logged in at EasyChair (reusing session)\n")
+    }
+  }, error = function(e) {
+    warning("EasyChair login failed: ", conditionMessage(e),
+            ". Falling back to cached data if available.")
+    easychair_logged_in <<- FALSE
+  })
 } else {
-  easychair_logged_in <- TRUE
-  cat("Already logged in at EasyChair (reusing session)\n")
+  cat("Skipping EasyChair login (no credentials available)\n")
 }
 ```
-
-## Submitted papers
 
 ```{r local_paths, echo=params$private_info}
 submissions_path <- here::here("submissions")
@@ -164,52 +173,66 @@ dir.create(review_files_path, recursive = TRUE, showWarnings = FALSE)
 cr_path <- here::here("camera-ready-full-papers")
 ```
 
-### Submission metadata
+`r if(!params$private_info) {"<!--"}`
+
+## Submissions
 
 Retrieve all information about submissions from the EasyChair submissions system.
 The full submission information is not included in the public rendering of this report.
 Make sure that the shown columns in the submission table include the columns required in the code below.
 
 ```{r submissions, echo=FALSE, message=FALSE}
+submission_cache_file <- file.path(submissions_path, "submission_table.csv")
+
 if(!easychair_logged_in) {
-  cat("EasyChair login not available. Creating empty submission table.\n")
-  submission_table <- tibble(
-    `#` = integer(),
-    id = character(),
-    Title = character(),
-    Authors = character(),
-    Decisions = character(),
-    type = character(),
-    information = character(),
-    submission_id = character(),
-    paper = character(),
-    file = character()
-  )
-  cat("No submissions available (EasyChair not connected).\n")
+  if(file.exists(submission_cache_file)) {
+    cat("EasyChair login not available. Loading submission table from cache:", submission_cache_file, "\n")
+    submission_table <- readr::read_csv(submission_cache_file, show_col_types = FALSE)
+    submission_table <- submission_table %>%
+      mutate(id = str_pad(`#`, width = 3, side = "left", pad = "0")) %>%
+      mutate_if(is.character, list(~na_if(.,"")))
+  } else {
+    cat("EasyChair login not available and no cached data found. Creating empty submission table.\n")
+    submission_table <- tibble(
+      `#` = integer(),
+      id = character(),
+      Title = character(),
+      Authors = character(),
+      Decisions = character(),
+      type = character(),
+      information = character(),
+      submission_id = character(),
+      paper = character(),
+      file = character()
+    )
+  }
 } else {
 submissions_url <- paste0("https://easychair.org/conferences2/submissions?a=", conference_id)
 
 # Configure displayed fields; Note: the names here must match the fields available, which may differ each year, it's best to login in the browser and transfer the values from a request performed there using the developer console; alternatively, login in the browser at the same time with the same credentials and activate all the fields there
-fields_response <- httr::POST(url = paste0("https://easychair.org/conferences/submission_field_hide_x.cgi?a=", conference_id),
+# Use the AJAX endpoint to enable Decisions and Keywords columns
+fields_response <- httr::POST(url = paste0("https://easychair.org/conferences2/submission_field_hide_x?a=", conference_id),
                          body = list(a = conference_id,
                                      keywords = "on",
                                      decision = "on",
-                                     time = "on",
-                                     visible = "65094",
-                                     visible = "65091",
-                                     visible = "65092",
-                                     visible = "65093",
-                                     button = "bf30720"),
+                                     time = "on"),
                          ec_ua)
 #cat("Selected all fields: ", toString(fields_response))
 
 # fetch submissions page after configuring fields
 submission_page <- httr::GET(url = submissions_url, ec_ua)
 
-# check we got the actual page and were not redirected to login
+# check we got the actual page and were not redirected to login; retry once after re-login
 if(grepl("signin", submission_page$url)) {
-  stop("EasyChair session expired or login failed — redirected to: ", submission_page$url, ". ",
-       "Re-run the easychair_login chunk.")
+  cat("Session expired, re-logging in...\n")
+  login_response <- ec_login()
+  fields_response <- httr::POST(url = paste0("https://easychair.org/conferences2/submission_field_hide_x?a=", conference_id),
+                           body = list(a = conference_id, keywords = "on", decision = "on", time = "on"), ec_ua)
+  submission_page <- httr::GET(url = submissions_url, ec_ua)
+  if(grepl("signin", submission_page$url)) {
+    stop("EasyChair session expired or login failed — redirected to: ", submission_page$url, ". ",
+         "Re-run the easychair_login chunk.")
+  }
 }
 
 submission_html <- xml2::read_html(submission_page)
@@ -258,9 +281,9 @@ for (i in 1:nrow(submission_table)) {
   }
 }
 
-
-#warnings("removing submissions 1 and 2, they are tests this year")
-#submission_table <- submission_table[3:nrow(submission_table),]
+# cache submission table for offline/public rendering
+readr::write_csv(submission_table, file = submission_cache_file)
+cat("Saved submission table cache to", submission_cache_file, "\n")
 
 } # end else (easychair_logged_in)
 
@@ -290,7 +313,7 @@ if(params$private_info) {
 The paper PDFs are downloaded from EasyChair directly using the links provided in the submission overview table.
 
 ```{r download_easychair, echo=FALSE}
-if(nrow(submission_table) > 0) {
+if(easychair_logged_in && nrow(submission_table) > 0) {
   for (i in 1:nrow(submission_table)) {
     if(is.na(submission_table[i,]$paper)) {
       cat("No paper URL for ", i, "\n")
@@ -305,6 +328,8 @@ if(nrow(submission_table) > 0) {
                                  overwrite = TRUE))
     }
   }
+} else if(!easychair_logged_in) {
+  cat("Skipping EasyChair PDF downloads (not logged in). Using locally available PDFs.\n")
 }
 
 submission_files <- dir(path = submissions_path, pattern = ".pdf$", full.names = TRUE)
@@ -431,7 +456,6 @@ About `r if(total_words > 0) round(after_cleanup/total_words * 100, digits = 0) 
 The following table shows how many words and non-stop words each document has, sorted by number of non-stop words.
 The `id` is built from the file name plus a prefix:
 for full papers, it is the left-padded submission number and the prefix `fp_`;
-<!--for short papers and posters, it is the submission number included in the file name and the prefixes `sp_` and `po_` respectively.-->
 
 ```{r stop_words, echo=FALSE, message=FALSE, warning=FALSE}
 nsw_per_doc <- no_stop_words %>%
@@ -556,9 +580,7 @@ dasa_similar_texts %>%
   scroll_box(height = "320px")
 ```
 
-`r if(!params$private_info) {"<!--"}`
 The following table shows the first `r excerpt_length` characters of the found DASA sections.
-`r if(!params$private_info) {"-->"}`
 
 ```{r dasa_section_table_md, echo=FALSE, eval=params$private_info}
 if(params$private_info) {
@@ -569,8 +591,6 @@ if(params$private_info) {
     scroll_box(height = "320px")
 }
 ```
-
-`r if(!params$private_info) {"<!--"}`
 
 The following papers do _not_ have a DASA section based on the pattern matching above:
 
@@ -587,7 +607,7 @@ right_join(submission_table,
 
 `r if(!params$private_info) {"-->"}`
 
-### Wordstem analysis
+## Wordstem analysis of all submissions
 
 ```{r wordstem_data, include=FALSE}
 wordstems <- no_stop_words %>%
@@ -722,28 +742,24 @@ word_counts_sums %>%
   scroll_box(height = "480px")
 ```
 
-------
-
 `r if(!params$private_info) {"<!--"}`
 
 ## Accepted full papers
 
 ### Full paper decisions
 
-There is "accept" and "conditionally accept" (after second review)!
-
-`r if(!params$private_info) {"-->"}`
-
-```{r scrape_accepted, echo=FALSE, eval=params$private_info}
-submission_table %>%
-  filter(type == "Full paper") %>%
-  group_by(Decisions) %>%
-  summarise(count = n()) %>%
-  kable() %>%
-  kable_styling("striped")
+```{r scrape_accepted, echo=FALSE}
+if(params$private_info) {
+  submission_table %>%
+    filter(type == "Full paper") %>%
+    group_by(Decisions) %>%
+    summarise(count = n()) %>%
+    kable() %>%
+    kable_styling("striped")
+}
 ```
 
-```{r compile review data, echo=FALSE, eval=params$private_info}
+```{r compile review data, echo=FALSE}
 review_data <- left_join(submission_table, dasa_texts %>% select(-type),
                          by = "id")
 
@@ -759,22 +775,21 @@ if(params$private_info) {
 }
 ```
 
-
-`r if(!params$private_info) {"<!--"}`
-
 ### Which accepted papers do still not hava a DASA section
 
-`r if(!params$private_info) {"-->"}`
-
-```{r accepted_no_dasa, echo=FALSE, eval=params$private_info}
-review_data %>%
-  filter(type == "Full paper") %>%
-  dplyr::filter(Decisions == "ACCEPT", is.na(`dasa_text`)) %>%
-  select(id,
-         Title,
-         #authors
-         )
+```{r accepted_no_dasa, echo=FALSE}
+if(params$private_info) {
+  review_data %>%
+    filter(type == "Full paper") %>%
+    dplyr::filter(Decisions == "ACCEPT", is.na(`dasa_text`)) %>%
+    select(id,
+           Title,
+           #authors
+           )
+}
 ```
+
+`r if(!params$private_info) {"-->"}`
 
 ## Reproducibility reviews
 
@@ -782,9 +797,7 @@ review_data %>%
 
 The assignment of reviews is done via a privately shared spreadsheet, to handle potential non-public comments.
 The main outcome of the reviews is a _report_, which is published in individual OSF projects as components of the [OSF project for the reproducibility reviews 2026](https://osf.io/hmxda/) or on [ResearchEquals](https://researchequals.com/).
-The report should be based on a template from this repository in [`report-template`](report-template).
-
-`r if(!params$private_info) {"<!--"}`
+The report should be based on one of the templates in the [`report-template` folder](https://github.com/reproducible-agile/reviews-2025/tree/main/report-template) in the repository for the 2026 reproducibility reviews.
 
 ### Forming the reproducibility committee
 
@@ -792,6 +805,8 @@ Send an email to participate in the committee before the deadline reminders for 
 
 - Directly to all members of previous years' reproducibility committees
 - To AGILE Community Mailing List: <mailto:agile-community@googlegroups.com>
+
+`r if(!params$private_info) {"<!--"}`
 
 ### Prepare reproducibility packages for reviewers
 
@@ -809,45 +824,33 @@ review_data_csv_file <- file.path(review_files_path, paste0("review_data_", lubr
 1. Write paper metadata (ID, decision, title) to a CSV file `r review_data_csv_file`
 1. **Manually** [import the paper metadata into the spreadsheet](https://www.tillerhq.com/how-to-import-csv-into-a-google-spreadsheet/) (Select cell `A1` then "File" > "Import" > "Import File" > "My Drive" then search for `review_data` and find `review_data.csv` then select the file > "Replace data at selected cell" and click "Import data")
 
-```{r accepted_fp_files_download_easychair, echo=FALSE, eval=params$private_info}
+```{r accepted_fp_files_download_easychair, echo=FALSE}
 review_files <- review_data %>%
   filter(type == "Full paper") %>%
   dplyr::filter(Decisions == "ACCEPT") %>%
   select(id, submission_id, Decisions, Title, file, paper)
 
-# first, re-download all accepted full paper PDFs to make sure we have latest copies
-for (i in 1:nrow(review_files)) {
-  current <- review_files[i,]
-  filename <- file.path(review_files_path, paste0(current$id, ".pdf"))
-  httr::GET(url = current$paper,
-              httr::write_disk(path = filename,
-                               overwrite = TRUE))
+if(easychair_logged_in) {
+  # re-download all accepted full paper PDFs to make sure we have latest copies
+  for (i in 1:nrow(review_files)) {
+    current <- review_files[i,]
+    filename <- file.path(review_files_path, paste0(current$id, ".pdf"))
+    httr::GET(url = current$paper,
+                httr::write_disk(path = filename,
+                                 overwrite = TRUE))
+  }
+} else {
+  cat("Skipping EasyChair download of accepted paper PDFs (not logged in). Using locally available files.\n")
 }
 ```
 
-<!--
-```{r update_camera_ready_file_paths, echo=FALSE, eval=params$private_info}
-# Use this chunk if camera ready files are not managed via EasyChair
-review_files <- review_data %>%
-  filter(type == "Full paper") %>%
-  dplyr::filter(Decisions == "ACCEPT") %>%
-  dplyr::mutate(file = stringr::str_replace(.$file, pattern = "submissions", replacement = "camera-ready-full-papers")) %>%
-  select(id, submission_id, Decisions, Authors, Title, file, paper) # note: you might have to adjust column names here between the years
-
-# copy camera ready files to upload directory
-for (i in 1:nrow(review_files)) {
-  current <- review_files[i,]
-  file.copy(from = file.path(cr_path, paste0(current$id, ".pdf")),
-            to = file.path(review_files_path, paste0(current$id, ".pdf")))
+```{r review_data_csv, echo=FALSE}
+if(params$private_info) {
+  readr::write_csv(review_files %>%
+                     select(ID = id, Decisions, Title),
+                   file = review_data_csv_file,
+                   append = FALSE)
 }
-```
--->
-
-```{r review_data_csv, echo=FALSE, eval=params$private_info}
-readr::write_csv(review_files %>%
-                   select(ID = id, Decisions, Title),
-                 file = review_data_csv_file,
-                 append = FALSE)
 ```
 
 #### Reviewer comments
@@ -949,6 +952,9 @@ retrieve_review <- function(id, submission_id) {
 }
 
 #retrieve_review(review_files[17,]$id, review_files[17,]$submission_id)
+
+# Re-login if session expired during the long PDF processing phases above
+ec_ensure_session()
 
 for(i in c(1:nrow(review_files))) {
   retrieve_review(review_files[i,]$id, review_files[i,]$submission_id)
@@ -1064,6 +1070,9 @@ retrieve_authors <- function(id, submission_id, authors, title) {
 #test_id <- 8
 #retrieve_authors(review_files[test_id,]$id, review_files[test_id,]$submission_id, review_files[test_id,]$Authors, review_files[test_id,]$Title)
 
+# Re-login if session expired since the review retrieval loop
+ec_ensure_session()
+
 for(i in c(1:nrow(review_files))) {
   retrieve_authors(review_files[i,]$id, review_files[i,]$submission_id, review_files[i,]$Authors, review_files[i,]$Title) # capitalization matters here, match column names!
 }
@@ -1072,12 +1081,11 @@ for(i in c(1:nrow(review_files))) {
 #### Upload submissions, reviews, and author contacts, to share
 
 ```{r review_files_upload_to_share, echo=FALSE, eval=params$private_info}
-if (params$private_info) {
-  # put accepted full papers to private share
+if (params$private_info && interactive()) {
+  # put accepted full papers to private share (requires interactive Google auth)
   library("googledrive")
-  googledrive::drive_auth(use_oob = TRUE)
-  submissions_and_reviews <- "https://drive.google.com/drive/folders/1bvNMoBJDfEFOPb4g0d66p7rxd9lwIAV6"
-  
+  googledrive::drive_auth()
+  submissions_and_reviews <- "https://drive.google.com/drive/folders/12YeZfdhWB8t6cckSSIkVwTj7Hn39kUjO"
   
   # upload review data file for manual import (see above)
   googledrive::drive_put(media = review_data_csv_file,
@@ -1108,7 +1116,7 @@ if (params$private_info) {
 ### Prepare CSV with titles and DOIs for publisher
 
 ```{r csv_for_publisher, eval=params$private_info}
-if(params$private_info) {
+if(params$private_info && interactive()) {
   googlesheets4::range_read(
     ss = "https://docs.google.com/spreadsheets/d/1q_oOQtv0m5gsKpCtTLhgyfbEMOBCC3dFw6M00mzyNYc/edit",
     range =  "review_data!A:F",
@@ -1177,8 +1185,8 @@ if(params$private_info) {
 
 1. Create a repository like this one based on the previous year
 1. Screen the accepted papers
-1. Distribute the reproductions amongst the committee members
-1. Support during reproductions, give feedback, advise on issues, ...
+1. Distribute the reproductions among the committee members
+1. Support committee members during reproductions, give feedback, advise on problems, ...
 1. After reports publication
     - Add reports on ResearchEquals to the collections [Reproducible AGILE](https://doi.org/10.53962/nxah-m4) and [CODECHECK](https://doi.org/10.53962/qtrx-1a)
     - Coordinate on the creation of [`codecheck.yml` configuration files](https://codecheck.org.uk/spec/config/1.0/)
@@ -1186,6 +1194,7 @@ if(params$private_info) {
     - After adding the reports to the CODECHECK register successfully, send a note to the reproducibility reviewers that they can create the Registration
     - "Archive" the projects on GitHub so that they become read-only ([instructions GitHub](https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-archiving-repositories), [instructions for GitLab](https://docs.gitlab.com/ee/user/project/settings/#archiving-a-project))
     - Double check all OSF projects have a DOI and a registration
+1. Contact conference chairs to coordinate on the presentation of the reproducibility review overview at the conference, e.g., at the AGILE meeting or the closing session
 
 ### Email templates for contacting authors
 
@@ -1318,7 +1327,7 @@ rmarkdown::render(input = "agile-reproducibility-reviews.Rmd",
                   output_dir = here::here("docs/"),
                   output_file = "index.html",
                   output_format = rmarkdown::html_document(toc = TRUE,
-                                                           self_contained = FALSE # not self-contained to better track changes in generated HTML
+                                                           self_contained = FALSE
                                                            )
                   )
 ```
