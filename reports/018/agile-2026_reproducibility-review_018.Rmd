@@ -61,8 +61,9 @@ TODO ADD FULL CITATION
 
 # Summary
 
-- Result of the reproduction
-- main outcome or figure
+- Workflow with environment packages in Docker container
+- demanding system requirements (GPU, storage), largely undocumented
+- CURRENT STATUS: No small enough subset working for reproduction
 
 \clearpage
 
@@ -80,6 +81,8 @@ It provides a clear Data and Software Availability section that points to the fo
 I forked the code repository to <https://github.com/reproducible-agile/2026-AGILE-GeoFM> at commit `0deeb785ac77cf4a27f2ae3f4334b6e9822b9970` to preserve the reproduction state and cloned the fork locally.
 Then I followed the instructions in the README.
 
+<!-- https://github.com/reproducible-agile/2026-AGILE-GeoFM/pull/1 -->
+
 The commands from section **Download Checkpoints for GroundingDINO, RemoteCLIP and RemoteSAM** 
 
 The clone operation from **Download RemoteSAM GitHub Repository** completes without error, though I'm not sure I clone it to the right location, because the README does not specify where to clone it to, and RemoteSam is not in the `.gitignore` of the project.
@@ -93,7 +96,7 @@ While the downloads are running, I start building the Docker image as documented
 
 When I try to run the provided command to start the container, I get an error related to the GPU:
 
-```bash
+```{bash gpu, eval=FALSE, size="tiny"}
 docker run --gpus device=1 --name geofm-container -d -it --mount type=bind,source="$(pwd)",target=/GEO python-geofm
 7390c4411bab427bd66562aadfbacee806e144a131a78c575495a2f8932ccedd
 docker: Error response from daemon: failed to create task for container: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: error during container init: error running prestart hook #0: exit status 1, stdout: , stderr: Auto-detected mode as 'legacy'
@@ -106,46 +109,156 @@ Leaving out the `--gpus` option results in the container starting, but I am not 
 
 I continue:
 
-```bash
+```{bash cpu, eval=FALSE, size="tiny"}
+docker run --name geofm-container -d -it --mount type=bind,source="$(pwd)",target=/GEO python-geofm
 docker cp geofm-container:/GEOtmp/GroundingDINO ./GroundingDINO
 Successfully copied 34.7MB to /home/daniel/git/reproducible-agile/reviews-2026/reports/018/2026-AGILE-GeoFM/GroundingDINO
 ```
 
-In the commands for running the models, _it is unclear with parametrization is needed to conduct the same steps as in the original work_.
+In the commands for running the models, _it is unclear with parametrization is needed to conduct the same steps as in the original work based on the instructiosn in the README along_.
+The authors only refer to the details in the article and made  [small changes](https://github.com/reproducible-agile/2026-AGILE-GeoFM/commit/5688d4484722717cb28acad595c37ad4fcf768ca) to the README.
 
 I try the first command with an additional `base` option, hoping that will be quicker:
 
-```bash
-root@69c678a97640:/GEO# python3 src/sam_gt_prompt.py --dataset bbd1k --model_name base
+```{bash base, eval=FALSE, size="tiny"}
+$ docker exec -it geofm-container bash
+root@5fd6d10ef029:/GEO# 2026-AGILE-GeoFM [main]$ docker run --name geofm-container -d -it --mount type=bind,source=&quot;$(pwd)&quot;,target=/GEO python-geofm
+bash: 2026-AGILE-GeoFM: command not found
+root@5fd6d10ef029:/GEO# 5fd6d10ef02933c879d0f4c0448d9483c197714ca6354aa33fb8a41ee8a838a7
+bash: 5fd6d10ef02933c879d0f4c0448d9483c197714ca6354aa33fb8a41ee8a838a7: command not found
+root@5fd6d10ef029:/GEO# 
+root@5fd6d10ef029:/GEO# python3 src/sam_gt_prompt.py --dataset bbd1k --model_name large --prompt bb
 total images: 4650
 The device used is cpu
 /opt/conda/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
   warnings.warn(
-preprocessor_config.json: 100%|...| 466/466 [00:00<00:00, 4.21MB/s]
-config.json: 6.57kB [00:00, 27.1MB/s]
-model.safetensors: 100%|...| 375M/375M [00:39<00:00, 9.61MB/s]
-  0%|                                                                                                                                          | 2/4650 [00:20<13:01:14, 10.08s/it]
+preprocessor_config.json: 100%|...| 466/466 [00:00&lt;00:00, 2.92MB/s]
+config.json: 6.57kB [00:00, 15.8MB/s]
+model.safetensors: 100%|...| 1.25G/1.25G [00:13&lt;00:00, 92.7MB/s]
+  1%|...| 47/4650 [29:42&lt;45:11:35, 35.35s/it]
 ```
 
-It seems to pick up the CPU - good.
+It seems to pick up the CPU - good - but if I read the progress bar right then the execution time is over 40 hours.
+That's not feasible.
 
-Aborted the computations after some time because I'd rather spend efforts on configurations/parametes matching the original work.
+Based on the information from the author that the `water1k` dataset is considerably smaller, I pick a specific command for that dataset, hoping it will be faster and allow me to achieve a partial reproduction.
+The following command should create parts of the data shown in Table 6 -- see inset below the information by the authors on mapping parameters to tables.
 
-_Reaching out to authors now!_ Questions:
+```{bash table6, eval=FALSE, size="tiny"}
+python3 src/sam_dino_prompt.py --dataset water1k --model_name large --dino_model_name SwinT --text_prompt water --box_threshold 0.35 --text_threshold 0.25
 
-- Should CPU usage be OK?
-- What are to be expected runtimes from your machines?
-- What are the commands run for the analysis of the paper?
-- What are the commands run to create the statistics from the paper?
+FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+total images: 312
+The device used is cpu
+FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /opt/conda/conda-bld/pytorch_1682343967769/work/aten/src/ATen/native/TensorShape.cpp:3483.)
+final text_encoder_type: bert-base-uncased
+tokenizer_config.json: 100%|...| 48.0/48.0 [00:00<00:00, 386kB/s]
+config.json: 100%|...| 570/570 [00:00<00:00, 6.13MB/s]
+vocab.txt: 232kB [00:00, 4.60MB/s]
+tokenizer.json: 466kB [00:00, 4.36MB/s]
+model.safetensors: 100%|...| 440M/440M [00:04<00:00, 90.5MB/s]
+  0%|                                                                                                                                                                                                     | 0/312 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/GEO/src/sam_dino_prompt.py", line 140, in <module>
+    main(args)
+  File "/GEO/src/sam_dino_prompt.py", line 67, in main
+    boxes, _, _ = predict(
+  File "/GEOtmp/GroundingDINO/groundingdino/util/inference.py", line 64, in predict
+    model = model.to(device)
+  File "/opt/conda/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1145, in to
+    return self._apply(convert)
+  File "/opt/conda/lib/python3.10/site-packages/torch/nn/modules/module.py", line 797, in _apply
+    module._apply(fn)
+  File "/opt/conda/lib/python3.10/site-packages/torch/nn/modules/module.py", line 797, in _apply
+    module._apply(fn)
+  File "/opt/conda/lib/python3.10/site-packages/torch/nn/modules/module.py", line 797, in _apply
+    module._apply(fn)
+  [Previous line repeated 3 more times]
+  File "/opt/conda/lib/python3.10/site-packages/torch/nn/modules/module.py", line 820, in _apply
+    param_applied = fn(param)
+  File "/opt/conda/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1143, in convert
+    return t.to(device, dtype if t.is_floating_point() or t.is_complex() else None, non_blocking)
+  File "/opt/conda/lib/python3.10/site-packages/torch/cuda/__init__.py", line 247, in _lazy_init
+    torch._C._cuda_init()
+RuntimeError: Found no NVIDIA driver on your system. Please check that you have an NVIDIA GPU and installed a driver from http://www.nvidia.com/Download/index.aspx
+```
 
---------
+The Python script does not seem to have an option to disable GPU support, and it seems to be hardcoded in the GroundingDINO code, which is not ideal for reproducibility.
+In my next attempt, I try to recreate some of the results from Table 7.
 
-- technical details about reproduction
-- code snippets
-- summary of communication with author
-- figures/screenshots
-- runtime
-- reproduction efforts
+```{bash table7, eval=FALSE, size="tiny"}
+python3 src/sam_automatic_label.py --dataset water1k --model_name large --points_per_side 32 --label 'a surface water' --clip_model_name ViT-bigG-14 --clip_threshold 0.7
+
+TODO
+```
+
+CONTINUE WITH HELP OF AUTHOR
+
+------
+
+**Information from the authors provided on request on mapping parameters to figure tables**
+
+> To generate the results, these are the commands run (the paper actually mentions all the parameters chosen for all the experiments):
+> 
+> **Table1:**
+> 
+> ```bash
+> python3 src/sam_gt_prompt.py --dataset bbd1k --model_name base --prompt bb
+> python3 src/sam_gt_prompt.py --dataset bbd1k --model_name base --prompt center_pt
+> python3 src/sam_gt_prompt.py --dataset bbd1k --model_name base --prompt multiple_pts --nr_pts 5
+> ```
+>
+> For the rest of the table, just change --model_name to large and then huge
+>
+> **Table 2:**
+> 
+> `python3 src/sam_gt_prompt.py --dataset bbd1k --model_name large --prompt multiple_pts --nr_pts 1`
+> 
+> and for the rest of the table, you just change --nr_pts 1 to 2, 4, 5, 10, and 20.
+> 
+> **Table 3:**
+> 
+> For the grounded SAM results:
+> 
+> `python3 src/sam_dino_prompt.py --dataset bbd1k --model_name large --dino_model_name SwinT --text_prompt building --box_threshold 0.35 --text_threshold 0.25`
+> 
+> And for the rest of the grounded SAM results, we replace `--text_prompt` with 'buildings', 'single buildings', 'building and structure', and 'building . buildings .'
+> 
+> For the rest of the table and to get the RemoteSAM results from Table 3:
+> 
+> `python3 src/remote_sam_text_prompt.py --dataset bbd1k --text_prompt building`
+> 
+> And for the rest of the RemoteSAM, we replace `--text_prompt` with 'buildings', 'single buildings', 'building and structure', and building buildings.
+> 
+> **Table 4:**
+> 
+> `python3 src/sam_automatic_label.py --dataset bbd1k --model_name large --points_per_side 32 --label buildings --clip_model_name ViT-bigG-14 --clip_threshold 0.7`
+> 
+>  For the rest of the results from the table, change the number of grid points by changing `--points_per_side` to 64 and 128.
+> 
+> To try RemoteCLIP model, change `--clip_model_name` to ViT-b-32 or ViT-L-14.
+> 
+> For testing Tip-Adapter, the pretrained models are provided under data/bbd1k_cache:
+> 
+> `python3 src/sam_automatic_label.py --dataset bbd1k --model_name large --points_per_side 32 --label buildings --clip_model_name ViT-bigG-14 --clip_threshold 0.7 --few-shot --cache_dir data/bbd1k_cache/ --shots 8 --beta 5 --alpha 1`
+> 
+> There is a script `generate_data_tip_adapter_f.py`, used to select images to train tip adapter and another script `train_tip_adapter_f.py` used to train the model.
+> 
+> 
+> **Table 5:**
+> 
+> Similar to Table 1 and 2, just change dataset to water1k. For `--prompt multiple_pts`, we investigate `--nr_pts` for 2, 5 and 10 only. 
+> 
+> As for before and after filtering, the results from the script are for after filtering (because they're more interesting). If you also want to get, the results without any filtering, you'll have to change the script: remove lines 139, 140 and 141 and only leave 142 and unindented.
+> 
+> **Table 6:**
+> 
+> Exact same as Table 3, just change dataset to water1k and text_prompt to the ones from the table.
+> 
+> **Table 7:**
+> 
+> Exact same as Table 4, just change dataset to water1k and label to 'a surface water'.
 
 ## Recommendations to the authors
 
@@ -187,4 +300,12 @@ osfr::osf_upload(x = project,
                           "COPYRIGHT"
                           )
                  )
+```
+
+# Colophon
+
+This document was created using [R Markdown](https://rmarkdown.rstudio.com/) using the following environment.
+
+```{r}
+sessionInfo()
 ```
