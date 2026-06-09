@@ -1118,8 +1118,8 @@ if (params$private_info && interactive()) {
 ```{r csv_for_publisher, eval=params$private_info}
 if(params$private_info && interactive()) {
   googlesheets4::range_read(
-    ss = "https://docs.google.com/spreadsheets/d/1q_oOQtv0m5gsKpCtTLhgyfbEMOBCC3dFw6M00mzyNYc/edit",
-    range =  "review_data!A:F",
+    ss = "https://docs.google.com/spreadsheets/d/1dqHyyw44DzOiqBgJJ3qcFFKMR_xNXJdMYXmF8lpaAa4/edit",
+    range =  "review assignments!A:F",
     col_types = "c"
     ) %>%
     select(`ID`, `Title`, `Report DOI URL`) %>%

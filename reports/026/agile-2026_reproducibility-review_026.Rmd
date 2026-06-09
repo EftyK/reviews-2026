@@ -1,0 +1,354 @@
+---
+title: "Reproducibility review of: Food Insecurity Projections for Anticipatory Action: A Comparative Spatiotemporal Analysis of FEWS NET and the IPC in Somalia"
+author: "Daniel Nüst \\orcid{0000-0002-0024-5046}"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output:
+  pdf_document:
+    toc: false
+papersize: a4
+header-includes:
+  - |
+    % https://tex.stackexchange.com/questions/445563/ieeetran-how-to-include-orcid-in-tex-pdf-with-pdflatex/445583 (works with pdflatex)
+    \usepackage{scalerel}
+    \usepackage{tikz}
+    \usetikzlibrary{svg.path}
+    \definecolor{orcidlogocol}{HTML}{A6CE39}
+    \tikzset{
+      orcidlogo/.pic={
+        \fill[orcidlogocol] svg{M256,128c0,70.7-57.3,128-128,128C57.3,256,0,198.7,0,128C0,57.3,57.3,0,128,0C198.7,0,256,57.3,256,128z};
+        \fill[white] svg{M86.3,186.2H70.9V79.1h15.4v48.4V186.2z}
+                     svg{M108.9,79.1h41.6c39.6,0,57,28.3,57,53.6c0,27.5-21.5,53.6-56.8,53.6h-41.8V79.1z     M124.3,172.4h24.5c34.9,0,42.9-26.5,42.9-39.7c0-21.5-13.7-39.7-43.7-39.7h-23.7V172.4z}
+                     svg{M88.7,56.8c0,5.5-4.5,10.1-10.1,10.1c-5.6,0-10.1-4.6-10.1-10.1c0-5.6,4.5-10.1,10.1-10.1C84.2,46.7,88.7,51.3,88.7,56.8z};
+      }
+    }
+    \newcommand\orcid[1]{\href{https://orcid.org/#1}{\raisebox{0.15 em}{\mbox{\scalerel*{
+    \begin{tikzpicture}[yscale=-1, transform shape]
+    \pic{orcidlogo};
+    \end{tikzpicture}
+    }{|}}}}}
+    \definecolor{agileblue}{RGB}{0,77,155}
+urlcolor: agileblue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\n \\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+```
+
+```{r logo, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', out.width='0.3\\linewidth', fig.pos='H'}
+temp <- tempfile(fileext = ".pdf")
+download.file(url = "https://reproducible-agile.github.io/public/images/reproducible-AGILE-logo-square.pdf", destfile = temp)
+knitr::include_graphics(temp)
+```
+
+This report is part of the reproducibility review at the AGILE conference.
+For more information see [https://reproducible-agile.github.io/](https://reproducible-agile.github.io/).
+This document is published on ResearchEquals TODO LINK HERE.
+To cite the report use
+
+<!-- https://researchequals.com/en-US/outputs/116c857f-62fe-4ee3-94bd-a31dcb8aafd0/draft -->
+
+> TODO FULL REPORT CITATION HERE https://doi.org/10.53962/pdw8-n5v0
+
+# Reviewed paper
+
+TODO ADD FULL CITATION
+
+# Summary
+
+The article presents a comparative spatio-temporal analysis of food insecurity projections in Somalia.
+A workflow is provided as a collection of scripts and the environment is a Docker compose configuration.
+This workflow as described could be executed and all figures and maps from the article were recreated with the code and data provided.
+The reproduction is fully successful.
+
+\clearpage
+
+# Reproducibility reviewer notes
+
+The article comprises a food security analysis including time series and statistical comparison in Somalia comparing two data sets.
+
+It provides a clear Data and Software Availability section that points to the project on GitHub at <https://github.com/GIScience/agile2026_food_insecurity_anticipatory_action> and several online data sources (APIs, download pages), which  the starting point for the reproduction.
+I create a fork at <https://github.com/reproducible-agile/agile2026_food_insecurity_anticipatory_action> at commit `4c5c11b3593f0acedafc9ec54c8d99bf04d82d95` to preserve the reproduction state and cloned the fork locally.
+Then I followed the instructions in the README.
+
+The repository structure is well described, a copy of the data is included in the repository.
+I did not attempt the data download myself.
+
+There is no formal environment specification but the list of required packages in the `Master_script.R` is reasonably small.
+I install missing packages manually, set the working directory manually to the source of the clone repo, and run the script lines one by one from RStudio on my Ubuntu Machine, see session info below.
+
+There is not runtime information provided.
+The script runs for a long time, and I let it run unattended (several hours?), but it does not complete successfully.
+
+The script fails in the last processing step `source("scripts/IPC_3_adm2_join.R")`:
+
+```{bash some_code, eval=FALSE, size="scriptsize"}
+> source("scripts/IPC_3_adm2_join.R")
+Rasterizing: current 2019-07-01 
+  |== [...] ==========================================| 100%
+  |== [...] ==========================================| 100%
+Rasterizing: current 2019-08-01 
+  |== [...] ==========================================| 100%
+  |== [...] ==========================================| 100%
+Rasterizing: current 2019-09-01 
+  |== [...] ==========================================| 100%
+  |== [...] ==========================================| 100%
+
+[...]
+
+Rasterizing proj 17379 17501 
+  |== [...] ==========================================| 100%
+  |== [...] ==========================================| 100%
+Rasterizing current 17713 17713 
+  |== [...] ==========================================| 100%
+  |== [...] ==========================================| 100%
+Rasterizing proj 17744 17866 
+  |== [...] ==========================================| 100%
+  |== [...] ==========================================| 100%
+Rasterizing current NA NA
+```
+
+While waiting for the computations to complete, I try to open the **QGIS** file in directory `QGIS` but get an error message about missing layers in the `figs` directory -- makes sense.
+The authors provided an update, see changes in <https://github.com/reproducible-agile/agile2026_food_insecurity_anticipatory_action/pull/1>.
+
+With the new containerised environment, the only change needed to run on my machine was `docker compose` instead of the command with hyphen, because I'm running a newer version of the tool.
+Opening <http://localhost:8887/> in the browser shows the RStudio IDE, and I can open the `Master_script.R` and run there by sourcing it.
+
+The script completes and ends with the following output:
+
+```{bash workflow_log_end, eval=FALSE, size="scriptsize"}
+[...]
+
+Rasterizing proj 20362 20423 
+  |===========================================================================================================| 100%
+  |===========================================================================================================| 100%
+Rasterizing current 19266 19327 
+  |===========================================================================================================| 100%
+  |===========================================================================================================| 100%
+Rasterizing proj 19358 19417 
+  |===========================================================================================================| 100%
+  |===========================================================================================================| 100%
+Rasterizing current 19905 19967 
+  |===========================================================================================================| 100%
+  |===========================================================================================================| 100%
+Rasterizing proj 19997 20058 
+  |===========================================================================================================| 100%
+  |===========================================================================================================| 100%
+Starting analysis workflow
+Rows: 9191 Columns: 6                                                                                                
+-- Column specification -----------------------------------------------------------------------------------------------
+Delimiter: ","
+chr  (3): adm2_name, adm2_pcode, scenario
+dbl  (2): phase_majority, phase_mean
+date (1): month
+
+(i) Use `spec()` to retrieve the full column specification for this data.
+(i) Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Rows: 20839 Columns: 6                                                                                               
+-- Column specification ----------------------------------------------------------------------------------------------
+Delimiter: ","
+chr  (3): adm2_name, adm2_pcode, scenario
+dbl  (2): phase_majority, phase_mean
+date (1): month
+
+(i) Use `spec()` to retrieve the full column specification for this data.
+(i) Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Deleting source `figs/map_files/ipc_mean_proj.gpkg' failed
+Writing layer `ipc_mean_proj' to data source `figs/map_files/ipc_mean_proj.gpkg' using driver `GPKG'
+Writing 91 features with 29 fields and geometry type Multi Polygon.
+Deleting source `figs/map_files/fews_mean_proj.gpkg' failed
+Writing layer `fews_mean_proj' to data source `figs/map_files/fews_mean_proj.gpkg' using driver `GPKG'
+Writing 91 features with 29 fields and geometry type Multi Polygon.
+Deleting source `figs/map_files/fews_proj_highclass.gpkg' failed
+Writing layer `fews_ml2_highclass' to data source `figs/map_files/fews_proj_highclass.gpkg' using driver `GPKG'
+Writing 91 features with 29 fields and geometry type Multi Polygon.
+Deleting source `figs/map_files/ipc_proj_highclass.gpkg' failed
+Writing layer `ipc_proj_highclass' to data source `figs/map_files/ipc_proj_highclass.gpkg' using driver `GPKG'
+Writing 91 features with 29 fields and geometry type Multi Polygon.
+Rows: 11466 Columns: 7                                                                                               
+-- Column specification ---------------------------------------------------------------------------------------------
+Delimiter: ","
+chr  (3): adm2_name, adm2_pcode, scenario
+dbl  (2): phase_majority, phase_mean
+date (2): start, end
+
+(i) Use `spec()` to retrieve the full column specification for this data.
+(i) Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Rows: 3185 Columns: 7                                                                                                
+-- Column specification ---------------------------------------------------------------------------------------------
+Delimiter: ","
+chr  (3): adm2_name, adm2_pcode, scenario
+dbl  (2): phase_majority, phase_mean
+date (2): start, end
+
+(i) Use `spec()` to retrieve the full column specification for this data.
+(i) Specify the column types or set `show_col_types = FALSE` to quiet this message.
+Deleting source `figs/map_files/fews_mean_bias.gpkg' failed
+Writing layer `fews_mean_bias' to data source `figs/map_files/fews_mean_bias.gpkg' using driver `GPKG'
+Writing 91 features with 4 fields and geometry type Multi Polygon.
+Deleting source `figs/map_files/ipc_mean_bias.gpkg' failed
+Writing layer `ipc_mean_bias' to data source `figs/map_files/ipc_mean_bias.gpkg' using driver `GPKG'
+Writing 91 features with 4 fields and geometry type Multi Polygon.
+Workflow completed successfully
+There were 18 warnings (use warnings() to see them)
+```
+
+The local git repo shows 497 files in the data directory, and 3 figures in figs, and 6 in figs/map_files, see output below.
+Unfortunately the README is lacking information to connect the generated files to the figures in the article, so I cannot easily verify if the generated files are correct and complete.
+
+Contents of `figs` directory:
+
+```{bash tree_figs, eval=FALSE, size="scriptsize"}
+figs/
+|-- Bias_matrices.png
+|-- Error_timeline.png
+|-- map_files
+|   |-- fews_mean_bias.gpkg
+|   |-- fews_mean_proj.gpkg
+|   |-- fews_proj_highclass.gpkg
+|   |-- ipc_mean_bias.gpkg
+|   |-- ipc_mean_proj.gpkg
+|   |-- ipc_proj_highclass.gpkg
+|-- Timeline_mean_phase.png
+```
+
+Contents of `data/` directory, as a condensed view (the full tree is very large, with many timestamped files, so I collapse them into date ranges with a coding agent):
+
+```{bash tree_data, eval=FALSE, size="scriptsize"}
+data/
+|-- FEWSNET_lhz
+|   |-- SO_2009_Cwt9JU5
+|   |   |-- SO_Admin2_LHZ_2009.3.{CPG,dbf,prj,sbn,sbx,shp,shx}        (7 files)
+|   |-- SO_2011_tjAQFko
+|   |   |-- SO_Admin2_LHZ_2011.3.{CPG,dbf,prj,sbn,sbx,shp,shp.xml,shx} (8 files)
+|   |-- SO_Admin2_LHZ_2016
+|       |-- SO_Admin2_LHZ_2016.2.{cpg,dbf,prj,sbn,sbx,shp,shp.xml,shx} (8 files)
+|-- intermediate
+|   |-- fews_all_long.gpkg
+|   |-- fews_all_long_ts.gpkg
+|   |-- fewsnet_all_geom.gpkg
+|   |-- IPC_all_long.gpkg
+|   |-- IPC_all_long_ts.gpkg
+|   |-- ipc_cs_p1_all.gpkg
+|   |-- fews_monthly_rasters
+|   |   |-- CS_<DATE>.tif      DATE in [2017-02-01 … 2025-10-01]   (25 files, quarterly Feb/Jun/Oct)
+|   |   |-- ML1_<DATE>.tif     DATE in [2017-02-01 … 2026-01-01]   (100 files, ~monthly w/ gaps)
+|   |   |-- ML2_<DATE>.tif     DATE in [2017-02-01 … 2026-05-01]   (104 files, ~monthly w/ gaps)
+|   |-- fews_period_rasters
+|   |   |-- CS_<START>_<END>.tif   START in [2017-02-01 … 2025-10-01]   (25 files)
+|   |   |-- ML1_<START>_<END>.tif  START in [2017-02-01 … 2025-10-01]   (75 files)
+|   |   |-- ML2_<START>_<END>.tif  START in [2017-02-01 … 2026-02-01]   (26 files)
+|   |-- ipc_monthly_rasters
+|   |   |-- current_<DATE>.tif  DATE in [2017-01-01 … 2025-09-01]   (40 files)
+|   |   |-- proj_<DATE>.tif     DATE in [2017-02-01 … 2025-12-01]   (61 files)
+|   |-- ipc_period_rasters
+|       |-- current_<START>_<END>.tif  START in [2017-01-01 … 2025-07-01]   (18 files)
+|       |-- proj_<START>_<END>.tif     START in [2017-02-01 … 2025-10-01]   (17 files)
+|-- IPC_current_API
+|   |-- Somalia_Acute_Food_Insecurity_<MONTH>_<YEAR>.geojson           (9 files, Jan/Jul/Aug 2017–2021)
+|-- IPC_p1_API
+|   |-- Somalia_Acute_Food_Insecurity_<MONTH>_<YEAR>.geojson           (9 files, same coverage as IPC_current_API)
+|-- IPC_website_dl
+|   |-- Somalia-Acute Food Insecurity <MONTH> <YEAR>.json + 1 Post GU  (9 files, scattered 2022–2025)
+|-- outputs
+|   |-- fews_adm2_period.csv
+|   |-- fews_adm2_ts.csv
+|   |-- ipc_adm2_period.csv
+|   |-- ipc_adm2_ts.csv
+|-- som_admin2.geojson
+|-- somalia_fews_all.csv
+
+13 directories, 553 files
+```
+
+I committed the files in `figs/` and `data/outputs` to the local git repo, but did not commit the 500MB+ of `data/intermediate` but only saved a generated `indext.txt`: [`9e1ff66fb417f1d73018d02f4825bc6d737c6000`](https://github.com/GIScience/agile2026_food_insecurity_anticipatory_action/commit/9e1ff66fb417f1d73018d02f4825bc6d737c6000)
+
+The following **figure files** generated by the code match the ones in the article fully based on visual inspection:
+
+```{r timeline-mean-phase, echo=FALSE, fig.cap="Reproduced Timeline of mean phase (cf. Fig. 1 in the paper)", out.width="100%"}
+knitr::include_graphics("agile2026_food_insecurity_anticipatory_action/figs/Timeline_mean_phase.png")
+```
+
+```{r bias-matrices, echo=FALSE, fig.cap="Reproduced Bias matrices (cf. Fig. 4 in the paper)", out.width="100%"}
+knitr::include_graphics("agile2026_food_insecurity_anticipatory_action/figs/Bias_matrices.png")
+```
+
+```{r error-timeline, echo=FALSE, fig.cap="Reproduced Error timeline (cf. Fig. 5 in the paper)", out.width="100%"}
+knitr::include_graphics("agile2026_food_insecurity_anticipatory_action/figs/Error_timeline.png")
+```
+
+Regarding the **map files** in the output folder, opening `QGIS/Map_visualizations.qgz` now works without errors.
+By selecting different layers in the QGIS project, I can visually verify that the maps match the ones in the article with some cartographic differences only, see screenshots below.
+
+```{r qgis-figure-2, echo=FALSE, fig.show="hold", out.width="49%", fig.cap="Screenshots of reproduced maps for Figure 2: FEWS NET mean (left) and IPC mean (right)."}
+knitr::include_graphics(c(
+  "agile2026_food_insecurity_anticipatory_action/QGIS/screenshot_figure-2-left_fewsnet_mean.png",
+  "agile2026_food_insecurity_anticipatory_action/QGIS/screenshot_figure-2-right_ipc_mean.png"
+))
+```
+
+```{r qgis-figure-3, echo=FALSE, fig.show="hold", out.width="49%", fig.cap="Screenshots of reproduced maps for Figure 3: share of projections of emergency/famine FEWS NET (left, layer named 'FEWSNET' incorrectly) and IPC (right)."}
+knitr::include_graphics(c(
+  "agile2026_food_insecurity_anticipatory_action/QGIS/screenshot_figure-3-left_fewsnet_percentage.png",
+  "agile2026_food_insecurity_anticipatory_action/QGIS/screenshot_figure-3-right_ipc_percentage.png"
+))
+```
+
+```{r qgis-figure-6, echo=FALSE, fig.show="hold", out.width="49%", fig.cap="Screenshots of reproduced maps Figure 6: FEWS NET projection bias (left) and IPC projection bias (right)."}
+knitr::include_graphics(c(
+  "agile2026_food_insecurity_anticipatory_action/QGIS/screenshot_figure-6-left_fewsnet_projection-bias.png",
+  "agile2026_food_insecurity_anticipatory_action/QGIS/screenshot_figure-6-right_ipc_projection-bias.png"
+))
+```
+
+## Recommendations to the authors
+
+- Add a license to the repository on GitHub, to clarify the legal situation for users and potential reusers of the code and data; this must also make transparent the licenses of the included data
+- Publish the data and code, even the output data, in a citable form (the licenses of the data files seem to allow redistribution) with a DOI, then properly cite it in your manuscript
+- Provide a usable environment specification that also pins versions (renv, etc.) and save your R session info output for transparency
+- In the README on GitHub:
+  - Include processing times (including efforts that went into preprocessing) to manage expectations of users with limited time or computational resources, and to make preprocessing efforts more transparent
+  - Add precise information about how the figures and statistics in the article are connected to the scripts generating them (which file creates with numbered figure?)
+- Having a Docker/docker-compose setup is great - even better if you seperate concerns of environment definition (which packages are installed) from the script; move install commands to a local Dockerfile
+
+
+```{r, echo=FALSE, eval=FALSE, results='hide'}
+# create ZIP of reproduction files and upload to OSF
+library("zip")
+library("here")
+
+zipfile <- here::here("PATH/agile-reproreview-YEAR-NUMBER.zip")
+file.remove(zipfile)
+zip::zipr(zipfile,
+          here::here("2020-018/files to add to the zip, if any"))
+
+library("osfr") # See docs at https://docs.ropensci.org/osfr/
+# OSF_PAT is in .Renviron in parent directory
+# We cannot use osfr to create a new component (with osfr::osf_create_component(x = osfr::osf_retrieve_node("6k5fh"), ...) because that will set the storage location to outside Europe.
+
+# retrieve project
+project <- osfr::osf_retrieve_node("OSF ID")
+
+# upload files
+osfr::osf_upload(x = project,
+                 conflicts = "overwrite",
+                 path = c(list.files(here::here("PATH"),
+                                     pattern = "agile-reproreview-.*(pdf$|Rmd$|zip$)",
+                                     full.names = TRUE),
+                          "COPYRIGHT"
+                          )
+                 )
+```
+
+# Colophon
+
+This document was created using [R Markdown](https://rmarkdown.rstudio.com/) using the following environment.
+
+```{r}
+sessionInfo()
+```
