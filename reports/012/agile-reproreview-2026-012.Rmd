@@ -56,7 +56,7 @@ Koukouraki, E. (2026, April).  Reproducibility review of: Analysis of the spatia
 
 # Reviewed paper
 
-ADD FULL CITATION
+Lautenbach, S., Maurer, M., and Zipf, A.: Analysis of the spatial and temporal pattern of COVID-19 incidence rate across Germany, AGILE GIScience Ser., 7, 9, https://doi.org/10.5194/agile-giss-7-9-2026, 2026.
 
 # Summary
 
